@@ -101,15 +101,13 @@ if page == "🎯 Создать план":
                         hours_per_week=hours_per_week
                     )
 
-                    plan = plan_data["weeks"]
-
-                # Сохраняем план в базу
+                    # Сохраняем план в базу
                 plan_id = save_plan(
                     goal,
                     level,
                     weeks,
                     hours_per_week,
-                    plan
+                    plan_data
                 )
 
                 st.success(
@@ -119,21 +117,21 @@ if page == "🎯 Создать план":
                 st.subheader("Ваш учебный план")
 
                 # Показываем созданный план
-                for week in plan:
+                for week in plan_data.weeks:
 
                     st.markdown(
-                        f"### Неделя {week['week']}"
+                        f"### Неделя {week.week}"
                     )
 
                     st.write(
-                        f"**Тема:** {week['topic']}"
+                        f"**Тема:** {week.topic}"
                     )
 
                     st.write(
-                        f"**Время:** {week['hours']} часов"
+                        f"**Время:** {week.hours} часов"
                     )
 
-                    for task in week["tasks"]:
+                    for task in week.tasks:
                         st.write(
                             f"• {task}"
                         )
@@ -168,9 +166,9 @@ elif page == "📚 Мои планы":
 
         # Создаём список названий планов
         plan_options = {
-            plan[0]: (
-                f"{plan[1]} — "
-                f"{plan[3]} недель"
+            plan.id: (
+                f"{plan.goal} — "
+                f"{plan.weeks} недель"
             )
             for plan in plans
         }
@@ -186,14 +184,14 @@ elif page == "📚 Мои планы":
         selected_plan = next(
             plan
             for plan in plans
-            if plan[0] == selected_plan_id
+            if plan.id == selected_plan_id
         )
 
-        plan_id = selected_plan[0]
-        goal = selected_plan[1]
-        level = selected_plan[2]
-        weeks = selected_plan[3]
-        hours_per_week = selected_plan[4]
+        plan_id = selected_plan.id
+        goal = selected_plan.goal
+        level = selected_plan.level
+        weeks = selected_plan.weeks
+        hours_per_week = selected_plan.hours_per_week
 
         st.subheader(goal)
 
@@ -237,11 +235,11 @@ elif page == "📚 Мои планы":
 
         for task in tasks:
 
-            task_id = task[0]
-            week = task[1]
-            topic = task[2]
-            task_text = task[3]
-            completed = task[4]
+            task_id = task.id
+            week = task.week
+            topic = task.topic
+            task_text = task.task
+            completed = task.completed
 
             # Если началась новая неделя
             if week != current_week:

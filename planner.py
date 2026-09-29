@@ -1,4 +1,8 @@
-def generate_plan(goal, level, weeks, hours_per_week):
+from models import PlanRequest, PlanWeek
+
+
+def generate_plan(goal, level, weeks, hours_per_week) -> list[PlanWeek]:
+    request = PlanRequest(goal, level, weeks, hours_per_week)
     plan = []
 
     topics = [
@@ -10,7 +14,7 @@ def generate_plan(goal, level, weeks, hours_per_week):
         "Итоговый проект",
     ]
 
-    for week in range(1, weeks + 1):
+    for week in range(1, request.weeks + 1):
         topic = topics[(week - 1) % len(topics)]
 
         tasks = [
@@ -19,13 +23,6 @@ def generate_plan(goal, level, weeks, hours_per_week):
             "Закрепить материал на небольшом практическом задании",
         ]
 
-        plan.append(
-            {
-                "week": week,
-                "topic": topic,
-                "hours": hours_per_week,
-                "tasks": tasks,
-            }
-        )
+        plan.append(PlanWeek(week, topic, request.hours_per_week, tuple(tasks)))
 
     return plan

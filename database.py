@@ -1,6 +1,7 @@
 import sqlite3
 
 from config import DATABASE_PATH
+from models import LearningPlan, PlanRecord, TaskRecord
 
 
 def get_connection():
@@ -39,7 +40,7 @@ def init_database():
     connection.close()
 
 
-def save_plan(goal, level, weeks, hours_per_week, plan):
+def save_plan(goal, level, weeks, hours_per_week, plan: LearningPlan):
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -60,8 +61,8 @@ def save_plan(goal, level, weeks, hours_per_week, plan):
 
     plan_id = cursor.lastrowid
 
-    for week in plan:
-        for task in week["tasks"]:
+    for week in plan.weeks:
+        for task in week.tasks:
             cursor.execute("""
                 INSERT INTO tasks (
                     plan_id,
@@ -72,8 +73,8 @@ def save_plan(goal, level, weeks, hours_per_week, plan):
                 VALUES (?, ?, ?, ?)
             """, (
                 plan_id,
-                week["week"],
-                week["topic"],
+                week.week,
+                week.topic,
                 task
             ))
 
@@ -82,7 +83,7 @@ def save_plan(goal, level, weeks, hours_per_week, plan):
 
     return plan_id
 
-def get_all_plans():
+def get_all_plans() -> list[PlanRecord]:
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -96,10 +97,10 @@ def get_all_plans():
 
     connection.close()
 
-    return plans
+    return [PlanRecord(*plan) for plan in plans]
 
 
-def get_plan_tasks(plan_id):
+def get_plan_tasks(plan_id) -> list[TaskRecord]:
     connection = get_connection()
     cursor = connection.cursor()
 
@@ -114,7 +115,16 @@ def get_plan_tasks(plan_id):
 
     connection.close()
 
-    return tasks
+    return [
+        TaskRecord(
+            id=task[0],
+            week=task[1],
+            topic=task[2],
+            task=task[3],
+            completed=bool(task[4]),
+        )
+        for task in tasks
+    ]
 
 def update_task_status(task_id, completed):
     connection = get_connection()
