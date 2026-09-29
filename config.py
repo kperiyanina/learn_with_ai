@@ -13,4 +13,7 @@ DATABASE_PATH = Path(
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-
+API_SECRET_KEY = os.getenv(
+    "API_SECRET_KEY",
+    "development-secret-change-me",
+)
