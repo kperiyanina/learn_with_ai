@@ -201,3 +201,80 @@
 - Все unit-тесты пройдены.
 - API-модули компилируются.
 - Streamlit запускается независимо от API.
+
+## Модульная структура кода
+
+**Статус:** выполнено
+**Дата:** 2026-09-30
+
+### Что сделано
+
+- `app.py` оставлен точкой входа Streamlit и больше не содержит всю
+  предметную логику интерфейса.
+- Добавлен пакет `ui`:
+  - `session.py` — состояние авторизации Streamlit;
+  - `auth_view.py` — формы входа и регистрации;
+  - `sidebar.py` — боковая навигация и выход;
+  - `create_plan_view.py` — форма создания плана;
+  - `plans_view.py` — список планов, задачи и прогресс;
+  - `profile_view.py` — профиль пользователя.
+- `api.py` оставлен точкой входа FastAPI.
+- API разделён на модули:
+  - `api_schemas.py` — Pydantic-схемы запросов и ответов;
+  - `api_dependencies.py` — авторизация и зависимости FastAPI;
+  - `api_routes_auth.py` — маршруты авторизации и профиля;
+  - `api_routes_plans.py` — маршруты планов, задач и прогресса.
+- Существующие `database.py`, `models.py`, `auth.py`, `ai.py` и
+  `api_auth.py` сохранены как независимые инфраструктурные и доменные модули.
+- Команды запуска не изменились:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app.py
+.\.venv\Scripts\python.exe -m uvicorn api:app --reload
+```
+
+### Проверки
+
+- `14` тестов пройдены.
+- Все модульные Python-файлы скомпилированы.
+- API healthcheck: `HTTP 200`.
+- Streamlit healthcheck: `HTTP 200`.
+
+## Дополнительная организация файлов
+
+**Статус:** выполнено
+**Дата:** 2026-09-30
+
+### Структура
+
+```text
+core/         конфигурация и доменные модели
+security/     пароли и токены доступа
+services/     AI-сервис и локальный генератор планов
+storage/      SQLite и операции с данными
+backend_api/  схемы, зависимости и маршруты FastAPI
+ui/           Streamlit-представления
+tests/        автоматические тесты
+scripts/      вспомогательные и демонстрационные скрипты
+app.py        точка запуска Streamlit
+api.py        точка запуска FastAPI
+```
+
+- `config.py` перемещён в `core/config.py`.
+- `models.py` перемещён в `core/models.py`.
+- `auth.py` и `api_auth.py` разделены на `security/passwords.py` и
+  `security/tokens.py`.
+- `ai.py` и `planner.py` перемещены в `services`.
+- `database.py` перемещён в `storage/database.py`.
+- API-модули перемещены в `backend_api`.
+- Тесты перемещены в `tests`.
+- Неиспользуемый шаблонный `main.py` перемещён в
+  `scripts/pycharm_demo.py`.
+- Корневые `app.py` и `api.py` сохранены как точки входа, поэтому команды
+  запуска не изменились.
+
+### Проверки
+
+- `14` тестов пройдены.
+- API healthcheck: `HTTP 200`.
+- Streamlit healthcheck: `HTTP 200`.
