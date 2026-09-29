@@ -1,24 +1,17 @@
-from ai import generate_ai_plan
+import unittest
 
-print("1. Файл запустился")
+from planner import generate_plan
 
-plan = generate_ai_plan(
-    goal="Научиться Python для анализа данных",
-    level="Начинающий",
-    weeks=4,
-    hours_per_week=5
-)
 
-print("2. AI ответил")
-print(plan)
+class PlannerTest(unittest.TestCase):
+    def test_generates_requested_number_of_weeks(self):
+        plan = generate_plan("Python", "Начинающий", 4, 5)
 
-for week in plan["weeks"]:
-    print()
-    print(f"НЕДЕЛЯ {week['week']}")
-    print(f"Тема: {week['topic']}")
-    print(f"Часы: {week['hours']}")
+        self.assertEqual(len(plan), 4)
+        self.assertEqual([week["week"] for week in plan], [1, 2, 3, 4])
+        self.assertTrue(all(week["hours"] == 5 for week in plan))
+        self.assertTrue(all(3 <= len(week["tasks"]) <= 5 for week in plan))
 
-    for task in week["tasks"]:
-        print(f"  - {task}")
 
-print("3. Готово")
+if __name__ == "__main__":
+    unittest.main()

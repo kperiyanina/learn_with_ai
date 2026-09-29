@@ -1,24 +1,19 @@
 import json
-import os
+import logging
 
-from dotenv import load_dotenv
 from groq import Groq
 
+from config import GROQ_API_KEY, GROQ_MODEL
 
-load_dotenv()
-
-api_key = os.getenv("GROQ_API_KEY")
-
-if not api_key:
-    raise ValueError(
-        "Не найден GROQ_API_KEY. "
-        "Проверь файл .env."
-    )
-
-client = Groq(api_key=api_key)
+logger = logging.getLogger(__name__)
 
 
 def generate_ai_plan(goal, level, weeks, hours_per_week):
+    if not GROQ_API_KEY:
+        raise RuntimeError(
+            "AI-сервис недоступен: не задан GROQ_API_KEY. "
+            "Добавьте ключ в файл .env."
+        )
 
     prompt = f"""
 Ты — AI-помощник по планированию обучения.
@@ -68,8 +63,9 @@ def generate_ai_plan(goal, level, weeks, hours_per_week):
 }}
 """
 
+    client = Groq(api_key=GROQ_API_KEY)
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b",
+        model=GROQ_MODEL,
         messages=[
             {
                 "role": "user",
@@ -79,21 +75,25 @@ def generate_ai_plan(goal, level, weeks, hours_per_week):
         temperature=0.7
     )
 
-    content = response.choices[0].message.content
-
-    # Убираем возможные markdown-обёртки
-    content = content.strip()
-
-    if content.startswith("```"):
-        content = content.replace("```json", "")
-        content = content.replace("```", "")
-        content = content.strip()
+    content = _strip_json_fences(response.choices[0].message.content)
 
     try:
         return json.loads(content)
 
     except json.JSONDecodeError:
-        raise ValueError(
-            "ИИ вернул некорректный JSON.\n\n"
-            f"Ответ модели:\n{content}"
-        )
+        logger.error("AI returned invalid JSON")
+        raise ValueError("ИИ вернул некорректный JSON. Попробуйте повторить запрос.")
+
+
+def _strip_json_fences(content):
+    content = (content or "").strip()
+
+    if content.startswith("```"):
+        lines = content.splitlines()
+        if lines and lines[0].strip().lower() in {"```", "```json"}:
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        content = "\n".join(lines).strip()
+
+    return content

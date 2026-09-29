@@ -1,5 +1,7 @@
 .venv/
 .env
+.pytest_cache/
+.streamlit/
 __pycache__/
 *.pyc
 learnai.db

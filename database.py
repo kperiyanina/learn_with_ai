@@ -1,11 +1,12 @@
 import sqlite3
 
-
-DATABASE_NAME = "learnai.db"
+from config import DATABASE_PATH
 
 
 def get_connection():
-    return sqlite3.connect(DATABASE_NAME)
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
 
 
 def init_database():

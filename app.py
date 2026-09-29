@@ -1,4 +1,5 @@
 import streamlit as st
+import logging
 
 from ai import generate_ai_plan
 from database import (
@@ -10,6 +11,7 @@ from database import (
     get_plan_progress,
 )
 
+logger = logging.getLogger(__name__)
 
 # Инициализация базы данных
 init_database()
@@ -139,6 +141,7 @@ if page == "🎯 Создать план":
                     st.divider()
 
             except Exception as error:
+                logger.exception("Failed to create learning plan")
 
                 st.error(
                     f"Не удалось создать учебный план: {error}"
