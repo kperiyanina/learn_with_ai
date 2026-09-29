@@ -4,12 +4,14 @@ import logging
 from groq import Groq
 
 from config import GROQ_API_KEY, GROQ_MODEL
-from models import LearningPlan
+from models import LearningPlan, PlanRequest
 
 logger = logging.getLogger(__name__)
 
 
 def generate_ai_plan(goal, level, weeks, hours_per_week) -> LearningPlan:
+    PlanRequest(goal, level, weeks, hours_per_week)
+
     if not GROQ_API_KEY:
         raise RuntimeError(
             "AI-сервис недоступен: не задан GROQ_API_KEY. "
@@ -81,7 +83,7 @@ def generate_ai_plan(goal, level, weeks, hours_per_week) -> LearningPlan:
     try:
         raw_plan = json.loads(content)
     except json.JSONDecodeError as error:
-        logger.error("AI returned invalid JSON")
+        logger.error("ИИ вернул некорректный JSON")
         raise ValueError(
             "ИИ вернул некорректный JSON. Попробуйте повторить запрос."
         ) from error

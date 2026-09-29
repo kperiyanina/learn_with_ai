@@ -17,6 +17,13 @@ class AIHelpersTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "GROQ_API_KEY"):
             ai.generate_ai_plan("Python", "Начинающий", 4, 5)
 
+    @patch("ai.GROQ_API_KEY", "test-key")
+    def test_request_range_is_validated_before_ai_call(self):
+        with self.assertRaisesRegex(
+            ValueError, "Количество часов должно быть от 1 до 40"
+        ):
+            ai.generate_ai_plan("Python", "Начинающий", 4, 41)
+
     def test_stripped_content_is_valid_json(self):
         content = ai._strip_json_fences("```json\n{\"weeks\": []}\n```")
 
