@@ -1,7 +1,7 @@
 import unittest
 
-from models import PlanRequest, PlanWeek
-from planner import generate_plan
+from core.models import PlanRequest, PlanWeek
+from services.planner import generate_plan
 
 
 class PlannerTest(unittest.TestCase):

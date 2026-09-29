@@ -1,6 +1,6 @@
 import unittest
 
-from auth import hash_password, validate_credentials, verify_password
+from security.passwords import hash_password, validate_credentials, verify_password
 
 
 class AuthTest(unittest.TestCase):

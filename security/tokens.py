@@ -4,7 +4,7 @@ import hmac
 import json
 import time
 
-from config import API_SECRET_KEY
+from core.config import API_SECRET_KEY
 
 
 TOKEN_TTL_SECONDS = 60 * 60 * 24

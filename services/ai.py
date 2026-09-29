@@ -3,8 +3,8 @@ import logging
 
 from groq import Groq
 
-from config import GROQ_API_KEY, GROQ_MODEL
-from models import LearningPlan, PlanRequest
+from core.config import GROQ_API_KEY, GROQ_MODEL
+from core.models import LearningPlan, PlanRequest
 
 logger = logging.getLogger(__name__)
 

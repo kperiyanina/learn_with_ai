@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 import api
-import database
+from storage import database
 
 
 class ApiTest(unittest.TestCase):

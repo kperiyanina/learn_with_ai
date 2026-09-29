@@ -1,4 +1,4 @@
-from models import PlanRequest, PlanWeek
+from core.models import PlanRequest, PlanWeek
 
 
 def generate_plan(goal, level, weeks, hours_per_week) -> list[PlanWeek]:

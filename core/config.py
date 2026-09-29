@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 
-PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_DIR / ".env")
 
 DATABASE_PATH = Path(

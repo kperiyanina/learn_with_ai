@@ -1,14 +1,14 @@
 import sqlite3
 
-from config import DATABASE_PATH
-from auth import hash_password, validate_credentials, verify_password
-from models import (
+from core.config import DATABASE_PATH
+from core.models import (
     LearningPlan,
     PlanRecord,
     ProfileRecord,
     TaskRecord,
     UserRecord,
 )
+from security.passwords import hash_password, validate_credentials, verify_password
 
 
 def get_connection():
