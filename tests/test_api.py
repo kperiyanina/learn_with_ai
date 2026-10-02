@@ -66,6 +66,15 @@ class ApiTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 401)
 
+    def test_private_endpoints_reject_invalid_token(self):
+        response = self.client.get(
+            "/plans",
+            headers={"Authorization": "Bearer " + "invalid-token"},
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["detail"], "Недействительный токен доступа.")
+
     def test_invalid_plan_is_rejected_before_ai(self):
         email = f"invalid-{uuid.uuid4().hex}@example.com"
         token = self.client.post(
