@@ -2,7 +2,7 @@ import logging
 
 import streamlit as st
 
-from core.models import PlanRequest
+from core.models import LearningDiagnostic, PlanRequest
 from services.ai import generate_ai_plan
 from storage.database import save_plan
 
@@ -31,6 +31,18 @@ def render_create_plan(user_id: int) -> None:
         value=5,
         step=1,
     )
+    interests = st.text_area(
+        "Что вам особенно интересно изучать? (необязательно)",
+        max_chars=500,
+    )
+    preferred_format = st.selectbox(
+        "Предпочтительный формат занятий",
+        ["Смешанный формат", "Теория", "Практика", "Проектная работа"],
+    )
+    available_days = st.multiselect(
+        "В какие дни вы готовы заниматься?",
+        ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"],
+    )
 
     if not st.button("Создать учебный план"):
         return
@@ -41,6 +53,11 @@ def render_create_plan(user_id: int) -> None:
             level=level,
             weeks=weeks,
             hours_per_week=hours_per_week,
+        )
+        diagnostic = LearningDiagnostic(
+            interests=interests,
+            preferred_format=preferred_format,
+            available_days=tuple(available_days),
         )
     except ValueError as error:
         st.error(str(error))
@@ -53,6 +70,7 @@ def render_create_plan(user_id: int) -> None:
                 request.level,
                 request.weeks,
                 request.hours_per_week,
+                diagnostic,
             )
 
         save_plan(
@@ -62,6 +80,7 @@ def render_create_plan(user_id: int) -> None:
             request.hours_per_week,
             plan,
             user_id=user_id,
+            diagnostic=diagnostic,
         )
         st.success("Учебный план успешно создан!")
         render_plan(plan)

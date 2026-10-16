@@ -13,9 +13,11 @@ class AIHelpersTest(unittest.TestCase):
         self.assertEqual(ai._strip_json_fences(content), '{"weeks": []}')
 
     @patch("services.ai.GROQ_API_KEY", None)
-    def test_missing_api_key_is_reported_when_generating(self):
-        with self.assertRaisesRegex(RuntimeError, "GROQ_API_KEY"):
-            ai.generate_ai_plan("Python", "Начинающий", 4, 5)
+    def test_missing_api_key_uses_local_fallback(self):
+        plan = ai.generate_ai_plan("Python", "Начинающий", 4, 5)
+
+        self.assertIsInstance(plan, LearningPlan)
+        self.assertEqual(len(plan.weeks), 4)
 
     @patch("services.ai.GROQ_API_KEY", "test-key")
     def test_request_range_is_validated_before_ai_call(self):
@@ -43,6 +45,56 @@ class AIHelpersTest(unittest.TestCase):
             plan = ai.generate_ai_plan("Python", "Начинающий", 1, 5)
 
         self.assertIsInstance(plan, LearningPlan)
+        self.assertEqual(plan.weeks[0].topic, "Основы")
+
+    @patch("services.ai.GROQ_API_KEY", "test-key")
+    def test_provider_failure_uses_local_fallback(self):
+        with patch("services.ai.Groq") as groq_class:
+            groq_class.return_value.chat.completions.create.side_effect = (
+                TimeoutError("timeout")
+            )
+
+            plan = ai.generate_ai_plan("Python", "Начинающий", 1, 5)
+
+        self.assertIsInstance(plan, LearningPlan)
+        self.assertEqual(len(plan.weeks), 1)
+
+    @patch("services.ai.GROQ_API_KEY", "test-key")
+    def test_provider_is_retried_before_success(self):
+        with patch("services.ai.Groq") as groq_class:
+            create = groq_class.return_value.chat.completions.create
+            create.side_effect = [
+                TimeoutError("temporary"),
+                type(
+                    "Response",
+                    (),
+                    {
+                        "choices": [
+                            type(
+                                "Choice",
+                                (),
+                                {
+                                    "message": type(
+                                        "Message",
+                                        (),
+                                        {
+                                            "content": (
+                                                '{"weeks": [{"week": 1, '
+                                                '"topic": "Основы", "hours": 5, '
+                                                '"tasks": ["a", "b", "c"]}]}'
+                                            )
+                                        },
+                                    )()
+                                },
+                            )()
+                        ]
+                    },
+                )(),
+            ]
+
+            plan = ai.generate_ai_plan("Python", "Начинающий", 1, 5)
+
+        self.assertEqual(create.call_count, 2)
         self.assertEqual(plan.weeks[0].topic, "Основы")
 
 

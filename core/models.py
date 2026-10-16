@@ -31,6 +31,28 @@ class PlanRequest:
 
 
 @dataclass(frozen=True)
+class LearningDiagnostic:
+    interests: str = ""
+    preferred_format: str = "Смешанный формат"
+    available_days: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        if not isinstance(self.interests, str) or len(self.interests) > 500:
+            raise ValueError("Интересы должны содержать не более 500 символов.")
+        if self.preferred_format not in {
+            "Смешанный формат",
+            "Теория",
+            "Практика",
+            "Проектная работа",
+        }:
+            raise ValueError("Выбран некорректный формат занятий.")
+        if not isinstance(self.available_days, tuple) or not all(
+            isinstance(day, str) and day.strip() for day in self.available_days
+        ):
+            raise ValueError("Дни занятий указаны некорректно.")
+
+
+@dataclass(frozen=True)
 class PlanWeek:
     week: int
     topic: str
@@ -116,6 +138,39 @@ class TaskRecord:
     topic: str
     task: str
     completed: bool
+
+
+@dataclass(frozen=True)
+class MaterialRecord:
+    id: int
+    plan_id: int
+    task_id: int | None
+    week: int | None
+    title: str
+    url: str
+    material_type: str
+    tags: str
+    is_favorite: bool
+    completed: bool
+
+
+@dataclass(frozen=True)
+class LearningBlockRecord:
+    plan_id: int
+    week: int
+    topic: str
+    theory: str
+    quiz: tuple[dict[str, Any], ...]
+    resources: tuple[dict[str, str], ...]
+    task_guides: tuple[dict[str, str], ...]
+    theory_completed: bool
+    quiz_completed: bool
+    quiz_last_score: int | None
+    quiz_total_questions: int | None
+    quiz_attempts: int
+    quiz_best_score: int | None
+    quiz_best_total_questions: int | None
+    quiz_passed: bool
 
 
 @dataclass(frozen=True)

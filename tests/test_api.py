@@ -106,6 +106,43 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("только из цифр", response.json()["detail"])
 
+    def test_material_course_endpoints_are_available_for_owned_plan(self):
+        email = f"materials-{uuid.uuid4().hex}@example.com"
+        token = self.client.post(
+            "/auth/register",
+            json={"email": email, "password": "correct-password"},
+        ).json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        headers = {"Authorization": "Bearer " + token}
+        plan_response = self.client.post(
+            "/plans",
+            headers=headers,
+            json={
+                "goal": "Изучить Python",
+                "level": "Начинающий",
+                "weeks": 1,
+                "hours_per_week": 5,
+            },
+        )
+        self.assertEqual(plan_response.status_code, 201)
+        plan_id = plan_response.json()["id"]
+
+        recommendations_response = self.client.post(
+            f"/plans/{plan_id}/material-recommendations",
+            headers=headers,
+            json={
+                "topic": "Практический курс Python",
+            },
+        )
+        self.assertEqual(recommendations_response.status_code, 200)
+
+        availability_response = self.client.post(
+            "/materials/check-availability",
+            headers=headers,
+            json={"url": "https://docs.python.org/3/"},
+        )
+        self.assertEqual(availability_response.status_code, 200)
+
 
 if __name__ == "__main__":
     unittest.main()
