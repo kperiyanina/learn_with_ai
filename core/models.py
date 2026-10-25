@@ -183,3 +183,28 @@ class UserRecord:
 class ProfileRecord:
     user_id: int
     display_name: str
+
+
+@dataclass(frozen=True)
+class StudyPreferencesRecord:
+    user_id: int
+    study_days: tuple[str, ...]
+    study_time: str
+    timezone: str
+    reminders_enabled: bool
+    reminder_frequency: str
+
+
+@dataclass(frozen=True)
+class StudyStatsRecord:
+    plan_id: int
+    total_tasks: int
+    completed_tasks: int
+    total_weeks: int
+    completed_theory: int
+    passed_quizzes: int
+    total_quizzes: int
+    completed_materials: int
+    total_materials: int
+    study_minutes: int
+    progress: float

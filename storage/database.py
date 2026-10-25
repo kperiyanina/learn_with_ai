@@ -11,6 +11,8 @@ from core.models import (
     ProfileRecord,
     TaskRecord,
     UserRecord,
+    StudyPreferencesRecord,
+    StudyStatsRecord,
 )
 from security.passwords import hash_password, validate_credentials, verify_password
 
@@ -74,6 +76,29 @@ def init_database():
             interests TEXT NOT NULL DEFAULT '',
             preferred_format TEXT NOT NULL DEFAULT 'Смешанный формат',
             available_days TEXT NOT NULL DEFAULT '',
+            FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS study_preferences (
+            user_id INTEGER PRIMARY KEY,
+            study_days TEXT NOT NULL DEFAULT '',
+            study_time TEXT NOT NULL DEFAULT '19:00',
+            timezone TEXT NOT NULL DEFAULT 'Europe/Moscow',
+            reminders_enabled INTEGER NOT NULL DEFAULT 1,
+            reminder_frequency TEXT NOT NULL DEFAULT 'Ежедневно',
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS study_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            plan_id INTEGER NOT NULL,
+            minutes INTEGER NOT NULL,
+            note TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
         )
     """)
@@ -166,6 +191,10 @@ def register_user(email: str, password: str) -> UserRecord:
             "INSERT INTO profiles (user_id) VALUES (?)",
             (user_id,),
         )
+        cursor.execute(
+            "INSERT INTO study_preferences (user_id) VALUES (?)",
+            (user_id,),
+        )
         connection.commit()
         return UserRecord(user_id, email.strip().lower())
     except sqlite3.IntegrityError as error:
@@ -233,6 +262,160 @@ def update_profile(
         connection.commit()
     finally:
         connection.close()
+
+
+def get_study_preferences(user_id: int) -> StudyPreferencesRecord:
+    connection = get_connection()
+    try:
+        row = connection.execute(
+            """
+            SELECT user_id, study_days, study_time, timezone,
+                   reminders_enabled, reminder_frequency
+            FROM study_preferences
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+    finally:
+        connection.close()
+    if row is None:
+        return StudyPreferencesRecord(
+            user_id, (), "19:00", "Europe/Moscow", True, "Ежедневно"
+        )
+    return StudyPreferencesRecord(
+        row[0],
+        tuple(day for day in row[1].split(",") if day),
+        row[2],
+        row[3],
+        bool(row[4]),
+        row[5],
+    )
+
+
+def update_study_preferences(
+    user_id: int,
+    study_days: tuple[str, ...],
+    study_time: str,
+    timezone: str,
+    reminders_enabled: bool,
+    reminder_frequency: str,
+) -> None:
+    allowed_days = {"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"}
+    if not study_days or not set(study_days).issubset(allowed_days):
+        raise ValueError("Выберите хотя бы один день занятий.")
+    if len(study_time) != 5 or study_time[2] != ":":
+        raise ValueError("Укажите время занятий в формате ЧЧ:ММ.")
+    if reminder_frequency not in {"Ежедневно", "Только в дни занятий", "Еженедельно"}:
+        raise ValueError("Выберите корректную частоту напоминаний.")
+    connection = get_connection()
+    try:
+        connection.execute(
+            """
+            INSERT INTO study_preferences (
+                user_id, study_days, study_time, timezone,
+                reminders_enabled, reminder_frequency
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                study_days = excluded.study_days,
+                study_time = excluded.study_time,
+                timezone = excluded.timezone,
+                reminders_enabled = excluded.reminders_enabled,
+                reminder_frequency = excluded.reminder_frequency
+            """,
+            (
+                user_id,
+                ",".join(study_days),
+                study_time,
+                timezone.strip() or "Europe/Moscow",
+                int(reminders_enabled),
+                reminder_frequency,
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def log_study_session(
+    user_id: int,
+    plan_id: int,
+    minutes: int,
+    note: str = "",
+) -> None:
+    if not isinstance(minutes, int) or isinstance(minutes, bool) or not 1 <= minutes <= 1440:
+        raise ValueError("Продолжительность занятия должна быть от 1 до 1440 минут.")
+    connection = get_connection()
+    try:
+        owner = connection.execute(
+            "SELECT 1 FROM plans WHERE id = ? AND user_id = ?",
+            (plan_id, user_id),
+        ).fetchone()
+        if owner is None:
+            raise ValueError("Учебный план не найден.")
+        connection.execute(
+            """
+            INSERT INTO study_sessions (user_id, plan_id, minutes, note)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, plan_id, minutes, note.strip()[:500]),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def get_study_stats(plan_id: int, user_id: int) -> StudyStatsRecord:
+    connection = get_connection()
+    try:
+        plan = connection.execute(
+            "SELECT weeks FROM plans WHERE id = ? AND user_id = ?",
+            (plan_id, user_id),
+        ).fetchone()
+        if plan is None:
+            raise ValueError("Учебный план не найден.")
+        tasks = connection.execute(
+            "SELECT COUNT(*), COALESCE(SUM(completed), 0) FROM tasks WHERE plan_id = ?",
+            (plan_id,),
+        ).fetchone()
+        blocks = connection.execute(
+            """
+            SELECT COALESCE(SUM(theory_completed), 0),
+                   COALESCE(SUM(quiz_completed), 0), COUNT(*)
+            FROM learning_blocks WHERE plan_id = ?
+            """,
+            (plan_id,),
+        ).fetchone()
+        materials = connection.execute(
+            """
+            SELECT COUNT(*), COALESCE(SUM(completed), 0)
+            FROM materials WHERE plan_id = ?
+            """,
+            (plan_id,),
+        ).fetchone()
+        minutes = connection.execute(
+            """
+            SELECT COALESCE(SUM(minutes), 0) FROM study_sessions
+            WHERE plan_id = ? AND user_id = ?
+            """,
+            (plan_id, user_id),
+        ).fetchone()[0]
+    finally:
+        connection.close()
+    total = tasks[0] + plan[0] * 2 + materials[0]
+    completed = tasks[1] + blocks[0] + blocks[1] + materials[1]
+    return StudyStatsRecord(
+        plan_id=plan_id,
+        total_tasks=tasks[0],
+        completed_tasks=tasks[1],
+        total_weeks=plan[0],
+        completed_theory=blocks[0],
+        passed_quizzes=blocks[1],
+        total_quizzes=blocks[2],
+        completed_materials=materials[1],
+        total_materials=materials[0],
+        study_minutes=minutes,
+        progress=completed / total if total else 0,
+    )
 
 
 def claim_legacy_plans(user_id: int) -> None:
@@ -363,6 +546,51 @@ def get_all_plans(user_id: int | None = None) -> list[PlanRecord]:
     connection.close()
 
     return [PlanRecord(*plan) for plan in plans]
+
+
+def delete_plan(plan_id: int, user_id: int) -> None:
+    connection = get_connection()
+    try:
+        owner = connection.execute(
+            "SELECT 1 FROM plans WHERE id = ? AND user_id = ?",
+            (plan_id, user_id),
+        ).fetchone()
+        if owner is None:
+            raise ValueError("Учебный план не найден.")
+
+        connection.execute(
+            "DELETE FROM learning_block_quiz_attempts WHERE plan_id = ?",
+            (plan_id,),
+        )
+        connection.execute(
+            "DELETE FROM learning_blocks WHERE plan_id = ?",
+            (plan_id,),
+        )
+        connection.execute(
+            "DELETE FROM materials WHERE plan_id = ?",
+            (plan_id,),
+        )
+        connection.execute(
+            "DELETE FROM plan_diagnostics WHERE plan_id = ?",
+            (plan_id,),
+        )
+        connection.execute(
+            "DELETE FROM study_sessions WHERE plan_id = ? AND user_id = ?",
+            (plan_id, user_id),
+        )
+        connection.execute(
+            "DELETE FROM tasks WHERE plan_id = ?",
+            (plan_id,),
+        )
+        cursor = connection.execute(
+            "DELETE FROM plans WHERE id = ? AND user_id = ?",
+            (plan_id, user_id),
+        )
+        if cursor.rowcount == 0:
+            raise ValueError("Учебный план не найден.")
+        connection.commit()
+    finally:
+        connection.close()
 
 
 def get_plan_tasks(plan_id, user_id: int | None = None) -> list[TaskRecord]:

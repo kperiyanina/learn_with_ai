@@ -10,6 +10,7 @@ from storage.database import (
     get_plan_learning_blocks,
     get_plan_materials,
     get_plan_preferred_format,
+    delete_plan,
     mark_learning_block_theory_completed,
     save_learning_block,
     save_learning_block_quiz_result,
@@ -55,6 +56,7 @@ def render_plans(user_id: int) -> None:
     st.write(
         f"**Время:** {selected_plan.hours_per_week} часов в неделю"
     )
+    _render_plan_deletion(selected_plan.id, selected_plan.goal, user_id)
     st.divider()
 
     progress = get_plan_progress(selected_plan.id, user_id)
@@ -64,11 +66,32 @@ def render_plans(user_id: int) -> None:
     recommendation = get_adaptive_recommendation(selected_plan.id, user_id)
     if recommendation:
         st.info(f"Адаптивная рекомендация: {recommendation}")
-    else:
-        st.success("Все задачи и материалы этого плана пройдены.")
     st.divider()
 
     _render_blocks(selected_plan.id, user_id)
+
+
+def _render_plan_deletion(plan_id: int, goal: str, user_id: int) -> None:
+    with st.container(key="delete-plan-section"):
+        with st.expander("Удалить учебный план", icon=":material/delete:"):
+            st.error(
+                f'План «{goal}» и весь его прогресс будут удалены без возможности восстановления.'
+            )
+            confirm_key = f"confirm_delete_plan_{plan_id}"
+            if st.checkbox("Я понимаю, что удаление необратимо", key=confirm_key):
+                if st.button(
+                    "Удалить план",
+                    key=f"delete_plan_{plan_id}",
+                    type="secondary",
+                ):
+                    try:
+                        delete_plan(plan_id, user_id)
+                        st.session_state.pop("learning_block", None)
+                        st.session_state.pop("selected_plan_id", None)
+                        st.session_state.pop(confirm_key, None)
+                        st.rerun()
+                    except ValueError as error:
+                        st.error(str(error))
 
 
 def _render_blocks(plan_id: int, user_id: int) -> None:
@@ -145,27 +168,31 @@ def render_learning_block(plan_id: int, week: int, user_id: int) -> None:
     if learning_block is None:
         try:
             preferred_format = get_plan_preferred_format(plan_id, user_id)
-            with st.spinner(
-                "ИИ создаёт теорию и тест для блока. Материал будет сохранён..."
-            ):
-                generated_material = generate_learning_material(
-                    plan.goal,
-                    plan.level,
-                    topic,
-                    plan.hours_per_week,
-                    tasks=tuple(task.task for task in tasks),
-                    preferred_format=preferred_format,
+            with st.container(horizontal_alignment="center"):
+                st.markdown(
+                    "**ИИ создаёт теорию и тест для блока.**  \n"
+                    "Материал будет сохранён автоматически.",
+                    text_alignment="center",
                 )
-                save_learning_block(
-                    plan_id=plan_id,
-                    week=week,
-                    topic=topic,
-                    theory=generated_material["theory"],
-                    quiz=generated_material["quiz"],
-                    resources=generated_material.get("resources", []),
-                    task_guides=generated_material.get("task_guides", []),
-                    user_id=user_id,
-                )
+                with st.spinner("Подготавливаем учебный блок..."):
+                    generated_material = generate_learning_material(
+                        plan.goal,
+                        plan.level,
+                        topic,
+                        plan.hours_per_week,
+                        tasks=tuple(task.task for task in tasks),
+                        preferred_format=preferred_format,
+                    )
+                    save_learning_block(
+                        plan_id=plan_id,
+                        week=week,
+                        topic=topic,
+                        theory=generated_material["theory"],
+                        quiz=generated_material["quiz"],
+                        resources=generated_material.get("resources", []),
+                        task_guides=generated_material.get("task_guides", []),
+                        user_id=user_id,
+                    )
         except (RuntimeError, ValueError) as error:
             st.error(f"Не удалось создать учебный блок: {error}")
             if st.button("Повторить генерацию", key=f"retry_generation_{plan_id}_{week}"):
@@ -197,9 +224,6 @@ def render_learning_block(plan_id: int, week: int, user_id: int) -> None:
     ):
         delete_week_materials(plan_id, week, user_id)
         st.rerun()
-    if completed_count == len(materials):
-        st.success("Блок пройден!")
-
     for material in materials:
         with st.container(border=True):
             st.markdown(f"**{material.title}** · {material.material_type}")
@@ -224,9 +248,7 @@ def _render_learning_material(learning_block, tasks, user_id: int) -> None:
     st.subheader("Теория")
     st.caption("Шаг 1 из 2: изучите теорию и отметьте её завершённой.")
     st.markdown(learning_block.theory)
-    if learning_block.theory_completed:
-        st.success("Теория отмечена как пройденная.")
-    elif st.button(
+    if not learning_block.theory_completed and st.button(
         "Отметить теорию как пройденную",
         key=f"theory_completed_{learning_block.plan_id}_{learning_block.week}",
     ):
@@ -249,7 +271,7 @@ def _render_learning_material(learning_block, tasks, user_id: int) -> None:
         )
         with st.container(border=True):
             st.markdown(f"**Задача {index + 1}. {task.task}**")
-            st.write(f"**Как выполнить:** {guide['instruction']}")
+            st.markdown(f"**Как выполнить:**\n\n{guide['instruction']}")
             st.write(f"**Ожидаемый результат:** {guide['expected_result']}")
             checked = st.checkbox(
                 "Задача выполнена",
@@ -288,7 +310,7 @@ def _render_learning_material(learning_block, tasks, user_id: int) -> None:
             f"(попыток: {learning_block.quiz_attempts})"
         )
         if learning_block.quiz_passed:
-            st.success("Тест пройден.")
+            st.info("Тест пройден.")
         else:
             st.warning("Порог 70% не достигнут. Попробуйте тест ещё раз.")
         if learning_block.quiz_best_score is not None:
@@ -328,7 +350,10 @@ def _render_learning_material(learning_block, tasks, user_id: int) -> None:
         st.session_state[f"{material_key}_result"] = (score, answers)
         _render_quiz_feedback(learning_block, score, answers)
 
-    if st.button("Пройти тест заново", key=f"{material_key}_retry"):
+    if learning_block.quiz_attempts > 0 and st.button(
+        "Пройти тест заново",
+        key=f"{material_key}_retry",
+    ):
         st.session_state[seed_key] = quiz_seed + 1
         st.session_state.pop(f"{material_key}_result", None)
         st.rerun()
@@ -345,7 +370,7 @@ def _render_learning_material(learning_block, tasks, user_id: int) -> None:
 def _render_quiz_feedback(learning_block, score: int, answers: list[str]) -> None:
     total = len(learning_block.quiz)
     if score / total >= 0.7:
-        st.success(f"Результат: {score} из {total}. Тест пройден.")
+        st.info(f"Результат: {score} из {total}. Тест пройден.")
     else:
         st.warning(
             f"Результат: {score} из {total}. Нужно набрать не менее 70%, "

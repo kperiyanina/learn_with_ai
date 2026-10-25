@@ -73,7 +73,7 @@ def render_create_plan(user_id: int) -> None:
                 diagnostic,
             )
 
-        save_plan(
+        saved_plan_id = save_plan(
             request.goal,
             request.level,
             request.weeks,
@@ -82,8 +82,9 @@ def render_create_plan(user_id: int) -> None:
             user_id=user_id,
             diagnostic=diagnostic,
         )
-        st.success("Учебный план успешно создан!")
-        render_plan(plan)
+        st.session_state.navigation_target = "📚 Мои планы"
+        st.session_state.selected_plan_id = saved_plan_id
+        st.rerun()
     except Exception as error:
         logger.exception("Не удалось создать учебный план")
         st.error(f"Не удалось создать учебный план: {error}")

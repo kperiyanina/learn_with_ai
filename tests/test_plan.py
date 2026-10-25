@@ -274,6 +274,54 @@ class PlannerTest(unittest.TestCase):
         finally:
             database.DATABASE_PATH = original_path
 
+    def test_stage_seven_preferences_and_study_time_are_persisted(self):
+        original_path = database.DATABASE_PATH
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                database.DATABASE_PATH = Path(temp_dir) / "stage_seven.db"
+                database.init_database()
+                user = database.register_user("stage7@example.com", "password123")
+                plan_id = database.save_plan(
+                    "Python",
+                    "Начинающий",
+                    1,
+                    5,
+                    LearningPlan(
+                        (
+                            PlanWeek(
+                                1,
+                                "Python основы",
+                                5,
+                                ("Изучить синтаксис", "Решить задачи", "Сделать проект"),
+                            ),
+                        )
+                    ),
+                    user_id=user.id,
+                )
+
+                database.update_study_preferences(
+                    user.id,
+                    ("Пн", "Ср"),
+                    "20:30",
+                    "Europe/Moscow",
+                    True,
+                    "Только в дни занятий",
+                )
+                preferences = database.get_study_preferences(user.id)
+                self.assertEqual(preferences.study_days, ("Пн", "Ср"))
+                self.assertEqual(preferences.study_time, "20:30")
+                self.assertEqual(preferences.reminder_frequency, "Только в дни занятий")
+
+                database.log_study_session(user.id, plan_id, 45, "Синтаксис")
+                database.log_study_session(user.id, plan_id, 15)
+                stats = database.get_study_stats(plan_id, user.id)
+                self.assertEqual(stats.study_minutes, 60)
+                self.assertEqual(stats.total_tasks, 3)
+                with self.assertRaises(ValueError):
+                    database.log_study_session(user.id, plan_id, 0)
+        finally:
+            database.DATABASE_PATH = original_path
+
 
 if __name__ == "__main__":
     unittest.main()
