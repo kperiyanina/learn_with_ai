@@ -75,14 +75,40 @@ def build_learning_material_prompt(
 
 Требования:
 1. Теория должна быть конкретной, практичной и рассчитанной на самостоятельное изучение.
-2. Для каждой задачи из списка создай ровно одну task_guides с инструкцией и
+2. Начни с ключевых понятий темы и объясни, как они связаны с практикой.
+3. Выпиши основные термины и покажи один небольшой пример, который можно повторить.
+4. После примера предложи наблюдение: как изменится результат при изменении входных данных.
+5. Для каждой задачи из списка создай ровно одну task_guides с инструкцией и
    ожидаемым результатом. Не заменяй практику одним чек-листом.
-3. Добавь от 3 до 5 вопросов теста, по 3-4 варианта ответа в каждом.
-4. Поле correct — индекс правильного варианта, начиная с 0.
-5. resources — необязательный массив: добавляй только проверенные ссылки, если они
+6. Добавь от 3 до 5 вопросов теста, по 3-4 варианта ответа в каждом.
+7. Поле correct — индекс правильного варианта, начиная с 0.
+8. resources — необязательный массив: добавляй только проверенные ссылки, если они
    действительно нужны для углубления. Пустой массив допустим.
-6. Не возвращай текст вне JSON и не делай ссылки обязательной частью объяснения.
+9. Не возвращай текст вне JSON и не делай ссылки обязательной частью объяснения.
 """
+
+
+def _parse_json_response(content: str):
+    cleaned = _strip_json_fences(content or "")
+    if not cleaned:
+        raise ValueError("Пустой ответ модели")
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        escaped = re.sub(r"(?<!\\)\\(?=[\"\\/bfnrtu])", "", cleaned)
+        try:
+            return json.loads(escaped)
+        except json.JSONDecodeError:
+            repaired = cleaned
+            repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+            repaired = re.sub(r"(\"(?:[^\"\\]|\\.)*?\")\s*:\s*\"([^\"\\]*(?:\\.[^\"\\]*)*)?\"", lambda m: m.group(0), repaired)
+            repaired = repaired.replace("\n", " ")
+            repaired = re.sub(r"(?<!\\)\"\s*\n\s*\"", '\\"', repaired)
+            try:
+                return json.loads(repaired)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Невалидный JSON от модели: {exc.msg} (строка {exc.lineno}, столбец {exc.colno})") from exc
 
 
 def generate_learning_material(
@@ -104,7 +130,7 @@ def generate_learning_material(
                 preferred_format,
             )
         )
-        raw_material = json.loads(_strip_json_fences(content))
+        raw_material = _parse_json_response(content)
         material = _validate_learning_material(raw_material, topic, goal, tasks)
         if material is not None:
             return material

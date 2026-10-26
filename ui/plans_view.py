@@ -166,9 +166,10 @@ def render_learning_block(plan_id: int, week: int, user_id: int) -> None:
 
     learning_block = get_learning_block(plan_id, week, user_id)
     if learning_block is None:
+        generation_message = st.empty()
         try:
             preferred_format = get_plan_preferred_format(plan_id, user_id)
-            with st.container(horizontal_alignment="center"):
+            with generation_message.container(horizontal_alignment="center"):
                 st.markdown(
                     "**ИИ создаёт теорию и тест для блока.**  \n"
                     "Материал будет сохранён автоматически.",
@@ -193,7 +194,9 @@ def render_learning_block(plan_id: int, week: int, user_id: int) -> None:
                         task_guides=generated_material.get("task_guides", []),
                         user_id=user_id,
                     )
+            generation_message.empty()
         except (RuntimeError, ValueError) as error:
+            generation_message.empty()
             st.error(f"Не удалось создать учебный блок: {error}")
             if st.button("Повторить генерацию", key=f"retry_generation_{plan_id}_{week}"):
                 st.rerun()
